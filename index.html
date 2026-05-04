@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Bookmark · Reading Tracker</title>
+  <meta name="description" content="Track your reading streaks with the Smart Bookmark device." />
+
+  <!-- PWA meta tags -->
+  <meta name="theme-color" content="#1a1208" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bookmark" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --ink:       #1a1208;
+      --parchment: #f4ede0;
+      --cream:     #faf6f0;
+      --warm-mid:  #c8a96e;
+      --accent:    #b5451b;
+      --accent-lt: #e07a54;
+      --muted:     #8a7a6a;
+      --card-bg:   rgba(255,252,246,0.92);
+      --border:    rgba(26,18,8,0.10);
+      --shadow:    0 2px 24px rgba(26,18,8,0.10);
+      --radius:    18px;
+    }
+
+    /* ─── Reset / Base ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      min-height: 100%;
+      font-family: 'Crimson Pro', Georgia, serif;
+      background: var(--parchment);
+      color: var(--ink);
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      overflow-x: hidden;
+    }
+
+    /* ─── Grain texture overlay ──────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      background-size: 200px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    /* ─── Layout ────────────────────────────────────────────────── */
+    .page {
+      position: relative; z-index: 1;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    /* ─── Header ────────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      padding: 20px 0 28px;
+    }
+    .header-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 38px;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: -0.01em;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+    .header-sub {
+      font-family: 'Crimson Pro', serif;
+      font-style: italic;
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ─── Cards ─────────────────────────────────────────────────── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      animation: fadeUp 0.4s ease both;
+    }
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.10s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.20s; }
+    .card:nth-child(5) { animation-delay: 0.25s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ─── Connect card ───────────────────────────────────────────── */
+    .connect-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .conn-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.4s;
+    }
+    .conn-dot.connected   { background: #5aaf6e; box-shadow: 0 0 0 4px rgba(90,175,110,0.2); }
+    .conn-dot.connecting  { background: var(--warm-mid); animation: pulse 1s ease infinite; }
+    #connStatus {
+      flex: 1;
+      font-size: 14px;
+      color: var(--muted);
+      font-style: italic;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(200,169,110,0.5); }
+      50%      { box-shadow: 0 0 0 6px rgba(200,169,110,0); }
+    }
+
+    /* ─── Buttons ────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 11px 20px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      font-weight: 400;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      text-transform: uppercase;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: var(--ink);
+      color: var(--parchment);
+      box-shadow: 0 2px 10px rgba(26,18,8,0.20);
+    }
+    .btn-primary:hover { box-shadow: 0 4px 18px rgba(26,18,8,0.30); }
+    .btn-accent {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 2px 10px rgba(181,69,27,0.25);
+    }
+    .btn-accent:hover { box-shadow: 0 4px 18px rgba(181,69,27,0.35); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ─── Streak hero ────────────────────────────────────────────── */
+    .streak-hero {
+      text-align: center;
+      padding: 10px 0 4px;
+    }
+    .streak-number {
+      font-family: 'Playfair Display', serif;
+      font-size: 72px;
+      line-height: 1;
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+    .streak-number.goal-met { color: var(--accent); }
+    .streak-unit {
+      font-family: 'Crimson Pro', serif;
+      font-style: italic;
+      font-size: 18px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .streak-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 4px 14px;
+      border-radius: 50px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+    .streak-badge.on-track { background: rgba(90,175,110,0.12); color: #3a8a4e; }
+    .streak-badge.keep-going { background: rgba(200,169,110,0.15); color: #8a6a20; }
+
+    /* ─── Battery bar ────────────────────────────────────────────── */
+    .batt-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .batt-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .batt-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent-lt), var(--warm-mid));
+      transition: width 0.6s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+    .batt-bar-fill.low { background: linear-gradient(90deg, #e05a3a, #c03020); }
+    .batt-pct {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--muted);
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* ─── Reading time section ───────────────────────────────────── */
+    .time-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .time-block {
+      background: rgba(26,18,8,0.04);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .time-block-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .time-block-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: -0.01em;
+    }
+    .time-block-unit {
+      font-family: 'Crimson Pro', serif;
+      font-style: italic;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .sessions-block {
+      background: rgba(181,69,27,0.06);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    /* ─── Goal card ──────────────────────────────────────────────── */
+    .goal-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .goal-input-wrap {
+      flex: 1;
+      position: relative;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 11px 46px 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: rgba(26,18,8,0.03);
+      font-family: 'DM Mono', monospace;
+      font-size: 16px;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.2s;
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type="number"]:focus { border-color: var(--warm-mid); }
+    .goal-unit {
+      position: absolute;
+      right: 12px; top: 50%;
+      transform: translateY(-50%);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      pointer-events: none;
+    }
+    #goalStatus {
+      font-style: italic;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    /* ─── Progress ring ──────────────────────────────────────────── */
+    .progress-section {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .ring-wrap {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
+    }
+    .ring-wrap svg { transform: rotate(-90deg); }
+    .ring-bg  { fill: none; stroke: rgba(26,18,8,0.08); stroke-width: 6; }
+    .ring-fill {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 220;
+      stroke-dashoffset: 220;
+      transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1);
+    }
+    .ring-fill.complete { stroke: #5aaf6e; }
+    .ring-pct {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      font-weight: 400;
+    }
+    .ring-details { flex: 1; }
+    .ring-details-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .ring-details-main {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .ring-details-sub {
+      font-family: 'Crimson Pro', serif;
+      font-style: italic;
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ─── Install banner ─────────────────────────────────────────── */
+    #installBanner {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: var(--ink);
+      color: var(--parchment);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 14px;
+      animation: fadeUp 0.4s ease both;
+    }
+    #installBanner .install-text {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #installBanner .install-text strong {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      display: block;
+      font-size: 16px;
+      margin-bottom: 2px;
+    }
+
+    /* ─── Divider lines in header ────────────────────────────────── */
+    .ornament {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 6px auto 0;
+      max-width: 180px;
+      color: var(--warm-mid);
+    }
+    .ornament-line { flex: 1; height: 1px; background: currentColor; opacity: 0.4; }
+    .ornament-dot { font-size: 10px; }
+
+    /* ─── Footer ─────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 10px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Install Banner (shown when PWA installable) -->
+  <div id="installBanner">
+    <div class="install-text">
+      <strong>Add to Home Screen</strong>
+      Open from your phone like an app
+    </div>
+    <button class="btn btn-accent" id="installBtn">Install</button>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="header-eyebrow">Smart Bookmark</div>
+    <h1>Read<em>ing</em></h1>
+    <div class="ornament">
+      <div class="ornament-line"></div>
+      <div class="ornament-dot">◆</div>
+      <div class="ornament-line"></div>
+    </div>
+    <div class="header-sub">Your daily reading companion</div>
+  </header>
+
+  <!-- Connect Card -->
+  <div class="card">
+    <div class="card-label">Device</div>
+    <div class="connect-card">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connStatus">Not connected</span>
+      <button class="btn btn-primary" id="connectBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Connect
+      </button>
+    </div>
+  </div>
+
+  <!-- Streak + Battery Card -->
+  <div class="card">
+    <div class="card-label">Streak</div>
+    <div class="streak-hero">
+      <div class="streak-number" id="streakNum">—</div>
+      <div class="streak-unit">day streak</div>
+      <div class="streak-badge keep-going" id="streakBadge">Waiting for device</div>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <div class="card-label" style="margin-bottom:8px;">Battery</div>
+      <div class="batt-row">
+        <div class="batt-bar-wrap">
+          <div class="batt-bar-fill" id="battFill"></div>
+        </div>
+        <div class="batt-pct" id="battPct">—%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Progress Card -->
+  <div class="card">
+    <div class="card-label">Today's Progress</div>
+    <div class="progress-section">
+      <div class="ring-wrap">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle class="ring-bg"   cx="40" cy="40" r="35"/>
+          <circle class="ring-fill" cx="40" cy="40" r="35" id="progressRing"/>
+        </svg>
+        <div class="ring-pct" id="progressPct">—</div>
+      </div>
+      <div class="ring-details">
+        <div class="ring-details-label">Today's reading</div>
+        <div class="ring-details-main" id="totalTimeDisplay">— min</div>
+        <div class="ring-details-sub">of <span id="goalDisplay">30</span> min goal</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reading Time Detail Card -->
+  <div class="card">
+    <div class="card-label">Session Detail</div>
+    <div class="time-grid">
+      <div class="time-block">
+        <div class="time-block-label">This session</div>
+        <div class="time-block-value" id="sessionMin">—</div>
+        <div class="time-block-unit" id="sessionUnit">min</div>
+      </div>
+      <div class="sessions-block">
+        <div class="time-block-label">Sessions today</div>
+        <div class="time-block-value" id="numSession">—</div>
+        <div class="time-block-unit">sessions</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goal Card -->
+  <div class="card">
+    <div class="card-label">Daily Goal</div>
+    <div class="goal-row">
+      <div class="goal-input-wrap">
+        <input type="number" id="dailyGoal" value="30" min="1" max="1440" />
+        <span class="goal-unit">min</span>
+      </div>
+      <button class="btn btn-accent" id="setGoalBtn" disabled>Set</button>
+    </div>
+    <div id="goalStatus"></div>
+  </div>
+
+  <footer>Smart Bookmark · v7</footer>
+</div>
+
+<script>
+  // ── UUIDs (match your Arduino sketch) ──────────────────────────
+  const SERVICE_UUID      = "77dd8d23-874a-495b-a364-e003832d116a";
+  const SESSION_UUID      = "596cae56-9a13-4613-a92e-2938fa61d581";
+  const TOTAL_UUID        = "18968c64-b397-4e78-94d2-0b2ebe4a8835";
+  const NUM_SESSION_UUID  = "270635b8-a7e2-4797-9548-f38f89ee0411";
+  const STREAK_UUID       = "c9244bee-1b9e-4b92-a4f4-89e5080d9fa1";
+  const BATTERY_UUID      = "5e4e7075-85c1-415a-94f8-66c0e04f6fec";
+  const SET_GOAL_UUID     = "360d57a7-e7e0-4719-8ac8-45bf09bcf749";
+
+  // ── State ───────────────────────────────────────────────────────
+  let device, server, service;
+  let sessionChar, totalChar, numSessionChar, streakChar, battChar, setGoalChar;
+  let goalMin = 30;
+
+  // ── DOM refs ────────────────────────────────────────────────────
+  const connDot      = document.getElementById('connDot');
+  const connStatus   = document.getElementById('connStatus');
+  const connectBtn   = document.getElementById('connectBtn');
+  const setGoalBtn   = document.getElementById('setGoalBtn');
+  const goalStatus   = document.getElementById('goalStatus');
+
+  // ── Format helpers ──────────────────────────────────────────────
+  function secToMin(sec) { return Math.floor(sec / 60); }
+  function secToSec(sec) { return sec % 60; }
+
+  function setConnState(state) {
+    connDot.className = 'conn-dot ' + state;
+    if (state === 'connected') {
+      connStatus.textContent = 'Connected to Bookmark';
+      connectBtn.textContent = 'Disconnect';
+      setGoalBtn.disabled = false;
+    } else if (state === 'connecting') {
+      connStatus.textContent = 'Connecting…';
+      connectBtn.disabled = true;
+    } else {
+      connStatus.textContent = 'Not connected';
+      connectBtn.textContent = 'Connect';
+      connectBtn.disabled = false;
+      setGoalBtn.disabled = true;
+    }
+  }
+
+  function updateStreak(days) {
+    const el = document.getElementById('streakNum');
+    const badge = document.getElementById('streakBadge');
+    el.textContent = days;
+    if (days >= 7) {
+      el.classList.add('goal-met');
+      badge.textContent = '🔥 On a roll!';
+      badge.className = 'streak-badge on-track';
+    } else if (days > 0) {
+      el.classList.remove('goal-met');
+      badge.textContent = 'Keep it up';
+      badge.className = 'streak-badge keep-going';
+    } else {
+      el.classList.remove('goal-met');
+      badge.textContent = 'Start your streak today';
+      badge.className = 'streak-badge keep-going';
+    }
+  }
+
+  function updateBattery(pct) {
+    document.getElementById('battPct').textContent = pct + '%';
+    const fill = document.getElementById('battFill');
+    fill.style.width = pct + '%';
+    fill.className = 'batt-bar-fill' + (pct < 20 ? ' low' : '');
+  }
+
+  function updateProgress(totalSec) {
+    const totalMinutes = secToMin(totalSec);
+    const pct = Math.min(100, Math.round((totalMinutes / goalMin) * 100));
+    const circumference = 220;
+    const offset = circumference - (pct / 100) * circumference;
+    const ring = document.getElementById('progressRing');
+    ring.style.strokeDashoffset = offset;
+    ring.className = 'ring-fill' + (pct >= 100 ? ' complete' : '');
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('totalTimeDisplay').textContent = totalMinutes + ' min';
+    document.getElementById('goalDisplay').textContent = goalMin;
+  }
+
+  function updateSession(sec) {
+    const m = secToMin(sec);
+    const s = secToSec(sec);
+    document.getElementById('sessionMin').textContent = m > 0 ? m : s;
+    document.getElementById('sessionUnit').textContent = m > 0 ? 'min' : 'sec';
+  }
+
+  // ── Connect ─────────────────────────────────────────────────────
+  connectBtn.addEventListener('click', async () => {
+    // Disconnect if already connected
+    if (device && device.gatt.connected) {
+      device.gatt.disconnect();
+      setConnState('');
+      return;
+    }
+
+    setConnState('connecting');
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [SERVICE_UUID],
+      });
+
+      device.addEventListener('gattserverdisconnected', () => setConnState(''));
+
+      server  = await device.gatt.connect();
+      service = await server.getPrimaryService(SERVICE_UUID);
+
+      totalChar      = await service.getCharacteristic(TOTAL_UUID);
+      streakChar     = await service.getCharacteristic(STREAK_UUID);
+      battChar       = await service.getCharacteristic(BATTERY_UUID);
+      sessionChar    = await service.getCharacteristic(SESSION_UUID);
+      numSessionChar = await service.getCharacteristic(NUM_SESSION_UUID);
+      setGoalChar    = await service.getCharacteristic(SET_GOAL_UUID);
+
+      // Initial reads
+      updateStreak((await streakChar.readValue()).getUint32(0, true));
+      updateBattery((await battChar.readValue()).getUint8(0));
+      updateProgress((await totalChar.readValue()).getUint32(0, true));
+      updateSession((await sessionChar.readValue()).getUint32(0, true));
+      document.getElementById('numSession').textContent =
+        (await numSessionChar.readValue()).getUint16(0, true);
+
+      // Subscribe to notifications
+      await totalChar.startNotifications();
+      await streakChar.startNotifications();
+      await battChar.startNotifications();
+      await sessionChar.startNotifications();
+      await numSessionChar.startNotifications();
+
+      sessionChar.addEventListener('characteristicvaluechanged', e =>
+        updateSession(e.target.value.getUint32(0, true)));
+      totalChar.addEventListener('characteristicvaluechanged', e =>
+        updateProgress(e.target.value.getUint32(0, true)));
+      numSessionChar.addEventListener('characteristicvaluechanged', e =>
+        document.getElementById('numSession').textContent = e.target.value.getUint16(0, true));
+      streakChar.addEventListener('characteristicvaluechanged', e =>
+        updateStreak(e.target.value.getUint32(0, true)));
+      battChar.addEventListener('characteristicvaluechanged', e =>
+        updateBattery(e.target.value.getUint8(0)));
+
+      setConnState('connected');
+    } catch (err) {
+      console.error(err);
+      setConnState('');
+      connStatus.textContent = 'Connection failed — try again';
+    }
+  });
+
+  // ── Set Goal ────────────────────────────────────────────────────
+  setGoalBtn.addEventListener('click', async () => {
+    const val = parseInt(document.getElementById('dailyGoal').value, 10);
+    if (isNaN(val) || val < 1 || val > 1440) {
+      goalStatus.textContent = 'Enter a value between 1 and 1440 minutes.';
+      return;
+    }
+    goalMin = val;
+    const bytes = new Uint8Array([val & 0xff, (val >> 8) & 0xff]);
+    await setGoalChar.writeValue(bytes);
+    goalStatus.textContent = 'Goal updated to ' + val + ' min.';
+    setTimeout(() => goalStatus.textContent = '', 3000);
+    updateProgress(0); // refresh ring scale
+  });
+
+  // ── PWA Install ─────────────────────────────────────────────────
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('installBanner').style.display = 'flex';
+  });
+  document.getElementById('installBtn').addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById('installBanner').style.display = 'none';
+  });
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('installBanner').style.display = 'none';
+  });
+
+  // ── Service Worker (PWA offline) ────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
