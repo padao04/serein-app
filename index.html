@@ -651,9 +651,10 @@
     setConnState('connecting');
     try {
       device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [SERVICE_UUID],
-      });
+      filters: [{ name: 'Bookmark' }],
+      optionalServices: [SERVICE_UUID],
+    });
+      
 
       device.addEventListener('gattserverdisconnected', () => setConnState(''));
 
