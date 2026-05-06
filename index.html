@@ -651,7 +651,7 @@
     setConnState('connecting');
     try {
       device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: 'Bookmark' }],
+      acceptAllDevices: true,
       optionalServices: [SERVICE_UUID],
     });
       
@@ -669,7 +669,7 @@
       setGoalChar    = await service.getCharacteristic(SET_GOAL_UUID);
 
       // Initial reads
-      updateStreak((await streakChar.readValue()).getUint32(0, true));
+      updateStreak((await streakChar.readValue()).getUint16(0, true));
       updateBattery((await battChar.readValue()).getUint8(0));
       updateProgress((await totalChar.readValue()).getUint32(0, true));
       updateSession((await sessionChar.readValue()).getUint32(0, true));
@@ -690,7 +690,7 @@
       numSessionChar.addEventListener('characteristicvaluechanged', e =>
         document.getElementById('numSession').textContent = e.target.value.getUint16(0, true));
       streakChar.addEventListener('characteristicvaluechanged', e =>
-        updateStreak(e.target.value.getUint32(0, true)));
+        updateStreak(e.target.value.getUint16(0, true)));
       battChar.addEventListener('characteristicvaluechanged', e =>
         updateBattery(e.target.value.getUint8(0)));
 
